@@ -34,7 +34,8 @@
     "commands": [
       {
         "command": "claudeProfiles.addAccount",
-        "title": "Add Account"
+        "title": "Add Account",
+        "icon": "$(add)"
       },
       {
         "command": "claudeProfiles.openFromSidebar",
@@ -42,11 +43,18 @@
       },
       {
         "command": "claudeProfiles.renameAccount",
-        "title": "Rename Account"
+        "title": "Rename Account",
+        "icon": "$(pencil)"
       },
       {
         "command": "claudeProfiles.deleteAccount",
-        "title": "Delete Account"
+        "title": "Delete Account",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "claudeProfiles.refresh",
+        "title": "Refresh Accounts",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
@@ -55,18 +63,23 @@
           "command": "claudeProfiles.addAccount",
           "when": "view == claudeProfilesView",
           "group": "navigation"
+        },
+        {
+          "command": "claudeProfiles.refresh",
+          "when": "view == claudeProfilesView",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
         {
           "command": "claudeProfiles.renameAccount",
           "when": "view == claudeProfilesView && viewItem == account",
-          "group": "inline"
+          "group": "inline@1"
         },
         {
           "command": "claudeProfiles.deleteAccount",
           "when": "view == claudeProfilesView && viewItem == account",
-          "group": "inline"
+          "group": "inline@2"
         }
       ]
     }
@@ -86,15 +99,18 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.110.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "typescript-eslint": "^8.56.1",
-    "eslint": "^9.39.3",
+    "@types/vscode": "^1.110.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.27.3",
+    "eslint": "^9.39.3",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.9.3",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "typescript-eslint": "^8.56.1"
+  },
+  "dependencies": {
+    "node-pty": "^1.1.0"
   }
 }
