@@ -11,12 +11,14 @@ import {
 } from "../utils";
 
 suite("accountEnv", () => {
-  test("sets HOME, USERPROFILE and XDG_CONFIG_HOME to accountPath", () => {
-    const p = "/some/account/path";
+  test("sets HOME, USERPROFILE, XDG_CONFIG_HOME, APPDATA, LOCALAPPDATA to accountPath", () => {
+    const p = path.join(os.tmpdir(), "some-account-path");
     const env = accountEnv(p);
     assert.strictEqual(env.HOME, p);
     assert.strictEqual(env.USERPROFILE, p);
     assert.strictEqual(env.XDG_CONFIG_HOME, p);
+    assert.strictEqual(env.APPDATA, path.join(p, "AppData", "Roaming"));
+    assert.strictEqual(env.LOCALAPPDATA, path.join(p, "AppData", "Local"));
   });
 
   test("spreads existing process.env", () => {
@@ -148,40 +150,26 @@ suite("readClaudeConfig", () => {
       path.join(accountPath, ".claude.json"),
       JSON.stringify({ oauthAccount: { emailAddress: "account@test.com" } }),
     );
-    const { email } = readClaudeConfig(accountPath, tmpDir);
+    const { email } = readClaudeConfig(accountPath);
     assert.strictEqual(email, "account@test.com");
   });
 
-  test("falls back to system home .claude.json when account config absent", () => {
+  test("returns null when account config is absent (no fallback to system home)", () => {
     const accountPath = path.join(tmpDir, "account1");
     fs.mkdirSync(accountPath);
+    // Even if system home has a .claude.json, we should NOT fall back to it
     fs.writeFileSync(
       path.join(tmpDir, ".claude.json"),
       JSON.stringify({ oauthAccount: { emailAddress: "home@test.com" } }),
     );
-    const { email } = readClaudeConfig(accountPath, tmpDir);
-    assert.strictEqual(email, "home@test.com");
+    const { email } = readClaudeConfig(accountPath);
+    assert.strictEqual(email, null);
   });
 
-  test("account config takes priority over system home", () => {
+  test("returns null when no config exists", () => {
     const accountPath = path.join(tmpDir, "account1");
     fs.mkdirSync(accountPath);
-    fs.writeFileSync(
-      path.join(accountPath, ".claude.json"),
-      JSON.stringify({ oauthAccount: { emailAddress: "account@test.com" } }),
-    );
-    fs.writeFileSync(
-      path.join(tmpDir, ".claude.json"),
-      JSON.stringify({ oauthAccount: { emailAddress: "home@test.com" } }),
-    );
-    const { email } = readClaudeConfig(accountPath, tmpDir);
-    assert.strictEqual(email, "account@test.com");
-  });
-
-  test("returns null when neither config exists", () => {
-    const accountPath = path.join(tmpDir, "account1");
-    fs.mkdirSync(accountPath);
-    const { email } = readClaudeConfig(accountPath, path.join(tmpDir, "nohome"));
+    const { email } = readClaudeConfig(accountPath);
     assert.strictEqual(email, null);
   });
 });

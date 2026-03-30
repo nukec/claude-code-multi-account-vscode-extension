@@ -1,5 +1,10 @@
 # Claude Code Multi-Account VSCode Extension — Project State
 
+**Last updated:** 2026-03-30
+**Last commit:** TBD
+
+---
+
 ## Goal
 
 Build a VS Code extension that enables **multiple Claude Code CLI accounts** using **session isolation (NOT API keys)**, all running on Claude Pro ($20/month).
@@ -22,8 +27,10 @@ Each terminal and exec call runs with:
 - `HOME` → account folder
 - `USERPROFILE` → account folder  (Windows: Node.js reads this, not HOME)
 - `XDG_CONFIG_HOME` → account folder
+- `APPDATA` → account folder/AppData/Roaming
+- `LOCALAPPDATA` → account folder/AppData/Local
 
-Claude stores its auth in `~/.claude.json`. With all three vars overridden, each account gets a fully isolated config and session.
+Claude stores its auth in `~/.claude.json`. With all env vars overridden, each account gets a fully isolated config and session.
 
 ---
 
@@ -47,7 +54,7 @@ Claude stores its auth in `~/.claude.json`. With all three vars overridden, each
 - Yellow circle = 70–89%
 - Red circle = ≥ 90%
 - Grey circle = not logged in
-- Inline buttons: ✏️ Rename (left), 🗑 Delete (right)
+- Inline buttons: ✏️ Rename (left), 🗑 Delete (right) — visible on hover (VS Code platform limitation)
 - Top bar: ➕ Add Account, 🔄 Refresh
 
 ### 3. Terminal Execution
@@ -56,7 +63,7 @@ Clicking a logged-in account:
 
 1. Reads email instantly from `~/.claude.json` (via `USERPROFILE` override) → sidebar updates immediately
 2. Opens terminal: `cwd = account folder`, env overridden as above, runs `claude`
-3. In background: spawns hidden PTY via `node-pty`, sends `/usage`, parses response, updates sidebar with usage % (~3–5s)
+3. In background: spawns hidden child process (`dist/pty-worker.js`) with `windowsHide: true`, which uses node-pty to send `/usage` and parse response, updates sidebar with usage % (~5–8s)
 
 Clicking a not-logged-in account:
 
@@ -68,24 +75,38 @@ Clicking a not-logged-in account:
 
 Reads directly from `USERPROFILE/.claude.json` → `oauthAccount.emailAddress`.
 
-Falls back to real system home (`C:\Users\{user}\.claude.json`) for accounts logged in before USERPROFILE isolation was added.
-
 No exec call needed — instant and reliable.
 
 ### 5. Usage Detection
 
-Uses `node-pty` to spawn a real PTY (required because `/usage` is a TTY-only REPL command):
+Uses a **detached hidden child process** (`dist/pty-worker.js`) to avoid conpty focus-stealing on Windows:
 
-1. Spawns `cmd.exe /c claude` in a hidden PTY with account env
-2. Waits for Claude welcome screen
-3. Sends `/usage`
-4. Parses output: prefers "Current week" percentage over session percentage
-5. Kills PTY, updates sidebar
+1. Extension spawns `node dist/pty-worker.js <accountPath>` with `windowsHide: true`
+2. Worker spawns a PTY internally, runs `claude`, sends `/usage`, parses output
+3. Result written to stdout, extension reads it and updates sidebar
+
+**Known issue:** Usage % not currently appearing in sidebar — pty-worker may be timing out or failing to parse. Under investigation.
 
 ### 6. Refresh Button
 
 - Email: updates instantly for all accounts from `.claude.json`
-- Usage: fetches all logged-in accounts in parallel via PTY (~5s total)
+- Usage: fetches all logged-in accounts in parallel via pty-worker
+
+---
+
+## Root Cause Discoveries (This Session)
+
+### Click events only firing once
+- **Cause:** `terminal.show()` without `preserveFocus: true` stole focus from the sidebar. Second click re-focused VS Code window instead of hitting the tree item.
+- **Fix:** Always call `terminal.show(true)`.
+
+### PTY breaking subsequent clicks
+- **Cause:** `node-pty` uses Windows conpty which creates a console host process that steals OS-level focus, even when no terminal UI is shown.
+- **Fix:** Moved PTY execution to a separate child process (`pty-worker.ts`) spawned with `windowsHide: true`, communicating results via stdout.
+
+### Windows Credential Manager — not an issue
+- Confirmed via `cmdkey /list`: Claude does NOT use Windows Credential Manager.
+- All auth stored in `USERPROFILE/.claude.json` only — USERPROFILE override is sufficient for isolation.
 
 ---
 
@@ -93,24 +114,29 @@ Uses `node-pty` to spawn a real PTY (required because `/usage` is a TTY-only REP
 
 ```
 src/
-  extension.ts   — VS Code extension entry point, all commands + UI
-  utils.ts       — Pure functions (testable): accountEnv, parseEmailFromJson,
-                   parseEmailFromConfig, readClaudeConfig, parseEmailAndUsageFromOutput
+  extension.ts     — VS Code extension entry point, all commands + UI
+  pty-worker.ts    — Standalone PTY worker, spawned as hidden child process
+  utils.ts         — Pure functions (testable): accountEnv, parseEmailFromJson,
+                     parseEmailFromConfig, readClaudeConfig, parseEmailAndUsageFromOutput
   test/
     utils.test.ts  — 35 unit tests (all passing)
+
+dist/
+  extension.js     — bundled extension
+  pty-worker.js    — bundled PTY worker (separate entry point)
 ```
 
 **Dependencies:**
-- `node-pty` (runtime) — PTY for usage detection
+- `node-pty` (runtime) — PTY for usage detection (used in pty-worker only)
 - All else: VS Code API + Node.js built-ins only
 
 ---
 
-## Known Limitations
+## Known Issues / Pending
 
-1. **Windows Credential Manager**: Claude may cache credentials at OS level. If two accounts share the same Windows credentials, isolation may be incomplete. The USERPROFILE override mitigates this for new logins.
-2. **Usage latency**: Usage % takes 3–8s to appear (PTY startup). Email shows instantly.
-3. **Login flow**: After clicking a not-logged-in account, user must log in manually via the browser. Sidebar updates when the terminal is closed.
+1. **Usage % not showing** — pty-worker spawned but result not reaching sidebar. Needs debugging.
+2. **Inline button visibility** — Edit/delete buttons only visible on hover. VS Code platform limitation, cannot be changed via contribution points.
+3. **Login flow** — After clicking a not-logged-in account, user must log in manually via browser. Sidebar updates when terminal is closed.
 
 ---
 

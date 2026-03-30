@@ -8,6 +8,9 @@ export function accountEnv(accountPath: string): NodeJS.ProcessEnv {
     HOME: accountPath,
     USERPROFILE: accountPath, // Windows: os.homedir() reads USERPROFILE, not HOME
     XDG_CONFIG_HOME: accountPath,
+    // Prevent Claude from leaking auth via Windows user-scoped app storage
+    APPDATA: path.join(accountPath, "AppData", "Roaming"),
+    LOCALAPPDATA: path.join(accountPath, "AppData", "Local"),
   };
 }
 
@@ -41,17 +44,12 @@ export function parseEmailFromConfig(filePath: string): string | null {
 }
 
 /**
- * Reads .claude.json from the account-isolated folder first,
- * then falls back to the real system home (for accounts logged in before isolation).
+ * Reads .claude.json from the account-isolated folder.
+ * No fallback to system home — that would cause all accounts to show the
+ * same email when a profile hasn't been logged in yet (false positive).
  */
-export function readClaudeConfig(
-  accountPath: string,
-  systemHome: string = process.env.USERPROFILE || process.env.HOME || "",
-): { email: string | null } {
-  const email =
-    parseEmailFromConfig(path.join(accountPath, ".claude.json")) ||
-    parseEmailFromConfig(path.join(systemHome, ".claude.json"));
-  return { email };
+export function readClaudeConfig(accountPath: string): { email: string | null } {
+  return { email: parseEmailFromConfig(path.join(accountPath, ".claude.json")) };
 }
 
 /** Parses email and usage % from the text output of `claude /usage`. */

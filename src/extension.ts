@@ -2,7 +2,6 @@ import { exec } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import type * as NodePty from "node-pty";
 import {
   accountEnv,
   parseEmailAndUsageFromOutput,
@@ -56,69 +55,26 @@ export function activate(context: vscode.ExtensionContext) {
     return readClaudeConfig(cwd).email;
   }
 
-  // node-pty gives us a real PTY so /usage works inside Claude's REPL
+  // Spawn pty-worker.js as a hidden child process — keeps conpty from stealing focus.
   function getUsageViaPty(cwd: string): Promise<string | null> {
     return new Promise((resolve) => {
-      let ptyModule: typeof NodePty;
-      try {
-        ptyModule = require("node-pty");
-      } catch {
-        return resolve(null);
-      }
+      const { spawn } = require("child_process") as typeof import("child_process");
+      const workerPath = path.join(__dirname, "pty-worker.js");
 
-      // node-pty env must be Record<string, string> — strip undefined values
-      const env = Object.fromEntries(
-        Object.entries(accountEnv(cwd)).filter(([, v]) => v !== undefined),
-      ) as Record<string, string>;
-
-      // On Windows, claude is a .cmd script — must spawn via cmd.exe
-      const [shell, args] = process.platform === "win32"
-        ? ["cmd.exe", ["/c", "claude"]]
-        : ["claude", []];
-
-      const proc = ptyModule.spawn(shell, args, {
-        name: "xterm-color",
-        cols: 220,
-        rows: 30,
-        cwd,
-        env,
+      const child = spawn(process.execPath, [workerPath, cwd], {
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "ignore"],
       });
 
       let output = "";
-      let usageSent = false;
-      let done = false;
+      child.stdout.on("data", (d: Buffer) => { output += d.toString(); });
 
-      proc.onData((data) => {
-        if (done) { return; }
-        output += data;
-        // Once Claude's welcome screen appears, send /usage
-        if (!usageSent && (output.includes("Claude Code") || output.includes("Welcome"))) {
-          usageSent = true;
-          setTimeout(() => { proc.write("/usage\r"); }, 300);
-        }
-        // Once we see a percentage in the post-usage output, we're done
-        if (usageSent) {
-          const stripped = output.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
-          const match = stripped.match(/(\d+)%/);
-          if (match) {
-            done = true;
-            try { proc.kill(); } catch { /* ignore */ }
-          }
-        }
-      });
+      const timer = setTimeout(() => { try { child.kill(); } catch { /* ignore */ } }, 12000);
 
-      const killTimer = setTimeout(() => {
-        if (!done) {
-          done = true;
-          try { proc.kill(); } catch { /* ignore */ }
-        }
-      }, 8000);
-
-      proc.onExit(() => {
-        clearTimeout(killTimer);
-        const stripped = output.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
-        const { usage } = parseEmailAndUsageFromOutput(stripped);
-        resolve(usage);
+      child.on("close", () => {
+        clearTimeout(timer);
+        const match = output.match(/(\d+)%/);
+        resolve(match ? match[1] + "%" : null);
       });
     });
   }
@@ -129,13 +85,17 @@ export function activate(context: vscode.ExtensionContext) {
       cwd: accountPath,
       env: accountEnv(accountPath),
     });
-    terminal.show();
+    terminal.show(true); // preserveFocus: keep sidebar focused so next click works immediately
     return terminal;
   }
 
   // Track terminals to refresh login status when they close
   const terminalAccountMap = new Map<vscode.Terminal, string>();
 
+  // ---------------------------------------------------------------------------
+  // TEST SCAFFOLD: hardcoded 2-row tree to verify click events work end-to-end.
+  // Real account rendering is commented out below; restore when click is confirmed.
+  // ---------------------------------------------------------------------------
   class Provider implements vscode.TreeDataProvider<string> {
     private _onDidChangeTreeData = new vscode.EventEmitter<void>();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
@@ -156,7 +116,6 @@ export function activate(context: vscode.ExtensionContext) {
 
       if (acc?.expectedEmail) {
         desc = acc.expectedEmail;
-        // Default to green; usage % refines the color once captured from terminal
         iconColor = new vscode.ThemeColor("testing.iconPassed");
         if (acc.usage) {
           desc += ` (${acc.usage})`;
@@ -173,12 +132,12 @@ export function activate(context: vscode.ExtensionContext) {
       item.description = desc;
       item.tooltip = desc;
       item.iconPath = new vscode.ThemeIcon(icon, iconColor);
+      item.contextValue = "account";
       item.command = {
         command: "claudeProfiles.openFromSidebar",
         title: "Open",
         arguments: [name],
       };
-      item.contextValue = "account";
 
       return item;
     }
@@ -188,8 +147,44 @@ export function activate(context: vscode.ExtensionContext) {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // ORIGINAL getTreeItem logic (kept for reference, restore later):
+  //
+  // getTreeItem(name: string): vscode.TreeItem {
+  //   const accounts = getAccounts();
+  //   const acc = accounts.find((a) => a.name === name);
+  //   const item = new vscode.TreeItem(name);
+  //   let desc = "Not logged in";
+  //   let icon = "circle-outline";
+  //   let iconColor: vscode.ThemeColor | undefined;
+  //   if (acc?.expectedEmail) {
+  //     desc = acc.expectedEmail;
+  //     iconColor = new vscode.ThemeColor("testing.iconPassed");
+  //     if (acc.usage) {
+  //       desc += ` (${acc.usage})`;
+  //       const pct = parseInt(acc.usage, 10);
+  //       if (pct >= 90) { iconColor = new vscode.ThemeColor("errorForeground"); }
+  //       else if (pct >= 70) { iconColor = new vscode.ThemeColor("problemsWarningIcon.foreground"); }
+  //     }
+  //     icon = "circle-filled";
+  //   }
+  //   item.description = desc;
+  //   item.tooltip = desc;
+  //   item.iconPath = new vscode.ThemeIcon(icon, iconColor);
+  //   item.contextValue = "account";
+  //   item.command = { command: "claudeProfiles.openFromSidebar", title: "Open", arguments: [name] };
+  //   return item;
+  // }
+  //
+  // getChildren(): Thenable<string[]> {
+  //   return Promise.resolve(getAccounts().map((a) => a.name));
+  // }
+  // ---------------------------------------------------------------------------
+
   const provider = new Provider();
-  vscode.window.registerTreeDataProvider("claudeProfilesView", provider);
+  const treeView = vscode.window.createTreeView("claudeProfilesView", {
+    treeDataProvider: provider,
+  });
 
   context.subscriptions.push(
     vscode.window.onDidCloseTerminal(async (closedTerminal) => {
@@ -267,14 +262,24 @@ export function activate(context: vscode.ExtensionContext) {
   const open = vscode.commands.registerCommand(
     "claudeProfiles.openFromSidebar",
     async (name: string) => {
+      console.log("[open] CALLED with name =", name);
+      const accountPath = getAccountPath(name);
+      console.log("[open] accountPath =", accountPath);
+
+      const terminal = vscode.window.createTerminal({
+        name: `Claude (${name})`,
+        cwd: accountPath,
+        env: accountEnv(accountPath),
+      });
+      terminal.show(true);
+      terminal.sendText("claude");
+
+      const email = await getEmail(accountPath);
+      console.log("[open] email =", email);
+
       const accounts = getAccounts();
       const acc = accounts.find((a) => a.name === name);
-      if (!acc) { return; }
-
-      const accountPath = getAccountPath(name);
-      const email = await getEmail(accountPath);
-
-      if (email) {
+      if (acc && email) {
         acc.expectedEmail = email;
         await context.globalState.update("accounts", accounts);
         await context.globalState.update("active_account", name);
@@ -282,21 +287,8 @@ export function activate(context: vscode.ExtensionContext) {
         provider.refresh();
       }
 
-      if (!email) {
-        openIncognito();
-        const terminal = createClaudeTerminal(name, accountPath);
-        terminalAccountMap.set(terminal, name);
-        terminal.sendText("claude");
-        terminal.sendText("/logout");
-        return;
-      }
-
-      const terminal = createClaudeTerminal(name, accountPath);
-      terminalAccountMap.set(terminal, name);
-      terminal.sendText("claude");
-
-      // Fetch usage in background via PTY; update sidebar when it arrives
       getUsageViaPty(accountPath).then(async (usage) => {
+        console.log("[open] PTY usage =", usage);
         if (!usage) { return; }
         const latest = getAccounts();
         const latestAcc = latest.find((a) => a.name === name);
@@ -308,21 +300,66 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
+  // ---------------------------------------------------------------------------
+  // ORIGINAL openFromSidebar (commented out during click-event test):
+  //
+  // const open = vscode.commands.registerCommand(
+  //   "claudeProfiles.openFromSidebar",
+  //   async (name: string) => {
+  //     const accounts = getAccounts();
+  //     const acc = accounts.find((a) => a.name === name);
+  //     if (!acc) { return; }
+  //     const accountPath = getAccountPath(name);
+  //     const email = await getEmail(accountPath);
+  //     if (email) {
+  //       acc.expectedEmail = email;
+  //       await context.globalState.update("accounts", accounts);
+  //       await context.globalState.update("active_account", name);
+  //       updateStatusBar();
+  //     }
+  //     if (!email) {
+  //       openIncognito();
+  //       const terminal = createClaudeTerminal(name, accountPath);
+  //       terminalAccountMap.set(terminal, name);
+  //       terminal.sendText("claude");
+  //       terminal.sendText("/logout");
+  //       return;
+  //     }
+  //     const terminal = createClaudeTerminal(name, accountPath);
+  //     terminalAccountMap.set(terminal, name);
+  //     terminal.sendText("claude");
+  //     getUsageViaPty(accountPath).then(async (usage) => {
+  //       if (!usage) { return; }
+  //       const latest = getAccounts();
+  //       const latestAcc = latest.find((a) => a.name === name);
+  //       if (!latestAcc) { return; }
+  //       latestAcc.usage = usage;
+  //       await context.globalState.update("accounts", latest);
+  //       provider.refresh();
+  //     });
+  //   },
+  // );
+  // ---------------------------------------------------------------------------
+
   const refreshAccounts = vscode.commands.registerCommand(
     "claudeProfiles.refresh",
     async () => {
       const accounts = getAccounts();
+      console.log("[claude-profiles] refresh: accounts =", JSON.stringify(accounts));
 
       // Refresh email instantly from .claude.json
       let emailChanged = false;
       for (const acc of accounts) {
-        const email = await getEmail(getAccountPath(acc.name));
+        const accountPath = getAccountPath(acc.name);
+        const email = await getEmail(accountPath);
+        console.log(`[claude-profiles] refresh: acc=${acc.name} path=${accountPath} email=${email} prev=${acc.expectedEmail}`);
         if (email !== (acc.expectedEmail ?? null)) {
           acc.expectedEmail = email || undefined;
           acc.usage = undefined; // reset usage so it re-fetches
           emailChanged = true;
         }
       }
+      console.log("[claude-profiles] refresh: emailChanged =", emailChanged);
       if (emailChanged) {
         await context.globalState.update("accounts", accounts);
       }
@@ -345,7 +382,7 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
-  context.subscriptions.push(addAccount, renameAccount, deleteAccount, open, refreshAccounts, statusBar);
+  context.subscriptions.push(addAccount, renameAccount, deleteAccount, open, refreshAccounts, statusBar, treeView);
 }
 
 export function deactivate() {}
