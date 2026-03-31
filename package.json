@@ -9,8 +9,12 @@
   "categories": [
     "Other"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nukec/claude-code-multi-account-extension"
+  },
   "activationEvents": [
-    "*"
+    "onView:claudeProfilesView"
   ],
   "main": "./dist/extension.js",
   "contributes": {

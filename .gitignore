@@ -19,7 +19,6 @@ pnpm-debug.log*
 out/
 dist/
 build/
-*.vsix
 
 # ------------------------------
 

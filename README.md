@@ -1,71 +1,122 @@
-# claude-code-multi-account README
+# Claude Code Multi-Account
 
-This is the README for your extension "claude-code-multi-account". After writing up a brief description, we recommend including the following sections.
+A VS Code extension for managing multiple [Claude Code](https://claude.ai/code) CLI accounts simultaneously — using session isolation, not API keys.
 
-## Features
-
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
-
-## Requirements
-
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
-
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+Designed for users on **Claude Pro ($20/month)** who want to rotate between multiple accounts to maximize usage.
 
 ---
 
-## Following extension guidelines
+## How It Works
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+Each account gets its own isolated directory inside VS Code's global storage. When you open a terminal for an account, the extension overrides the relevant environment variables so the `claude` CLI reads and writes auth/config to that account's folder only:
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+| Variable | Value |
+|---|---|
+| `HOME` | `<account-folder>` |
+| `USERPROFILE` | `<account-folder>` |
+| `XDG_CONFIG_HOME` | `<account-folder>` |
+| `APPDATA` | `<account-folder>/AppData/Roaming` |
+| `LOCALAPPDATA` | `<account-folder>/AppData/Local` |
 
-## Working with Markdown
+Claude stores its auth token in `~/.claude.json`. With all env vars pointed at an account-specific folder, sessions are fully isolated — no credential sharing between accounts.
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+---
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+## Features
 
-## For more information
+### Sidebar Account List
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+A dedicated sidebar panel shows all your accounts at a glance:
 
-**Enjoy!**
+```
+● main    user@example.com (10%)
+○ alt     Not logged in
+```
+
+- **Green circle** — logged in, usage < 70%
+- **Yellow circle** — logged in, usage 70–89%
+- **Red circle** — logged in, usage ≥ 90%
+- **Grey circle** — not logged in
+
+### Account Management
+
+- **Add** — creates a new isolated account folder
+- **Rename** — renames the account (and its folder)
+- **Delete** — removes the account with a confirmation dialog
+
+### Terminal Launch
+
+Click any account to open a terminal:
+
+- **Logged-in account** — opens a terminal with `claude` running under that account's environment
+- **Not-logged-in account** — opens Chrome in incognito to `claude.ai`, then opens a terminal so you can log in; sidebar updates automatically when the terminal closes
+
+### Status Bar
+
+Shows the currently active account: `⊙ Claude: main`
+
+---
+
+## Requirements
+
+- [Claude Code CLI](https://claude.ai/code) installed and on your `PATH`
+- VS Code 1.110.0+
+- Windows (primary target; macOS/Linux may work but are untested)
+
+---
+
+## Installation
+
+This extension is not yet published to the VS Code Marketplace. To install manually:
+
+1. Clone this repo
+2. Run `npm install`
+3. Run `npm run package` — produces `dist/extension.js`
+4. Press `F5` in VS Code to launch the Extension Development Host, or package as a `.vsix` with `vsce package`
+
+---
+
+## Development
+
+```bash
+npm run compile      # Type-check + lint + build (dev)
+npm run package      # Type-check + lint + build (prod, minified)
+npm run watch        # Watch mode
+npm run lint         # ESLint
+npm run check-types  # TypeScript strict type check
+npm run test         # Run tests
+```
+
+Press `F5` in VS Code to launch the Extension Development Host with the extension loaded.
+
+---
+
+## Known Issues
+
+- **Usage % display** — usage detection via PTY is still being debugged; the percentage may not always appear
+- **Edit/Delete buttons** — only visible on hover (VS Code platform limitation, cannot be changed)
+
+---
+
+## Architecture
+
+```
+src/
+  extension.ts     — All extension logic (commands, tree view, terminals)
+  pty-worker.ts    — Standalone PTY worker, spawned as a hidden child process for usage detection
+  utils.ts         — Pure utility functions (env setup, config parsing)
+  test/
+    utils.test.ts  — Unit tests
+
+dist/
+  extension.js     — Bundled extension
+  pty-worker.js    — Bundled PTY worker
+```
+
+**Dependencies:** `node-pty` (runtime) for PTY-based usage detection. Everything else uses VS Code API and Node.js built-ins only.
+
+---
+
+## License
+
+MIT

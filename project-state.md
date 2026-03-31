@@ -1,7 +1,7 @@
 # Claude Code Multi-Account VSCode Extension — Project State
 
 **Last updated:** 2026-03-31
-**Last commit:** 84f5464
+**Last commit:** TBD
 
 ---
 
@@ -129,6 +129,18 @@ dist/
 **Dependencies:**
 - `node-pty` (runtime) — PTY for usage detection (used in pty-worker only)
 - All else: VS Code API + Node.js built-ins only
+
+---
+
+## Session Work (2026-03-31)
+
+- Written proper public-facing `README.md` (features, architecture, install instructions)
+- Fixed `vsce package` warnings:
+  - Added `repository` field to `package.json`
+  - Changed activation event from `*` to `onView:claudeProfilesView`
+  - Added `LICENSE` (MIT)
+- Removed `*.vsix` from `.gitignore` so built packages are tracked
+- Repo made public-ready
 
 ---
 
