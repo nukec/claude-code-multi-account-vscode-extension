@@ -300,6 +300,15 @@ export function activate(context: vscode.ExtensionContext) {
       const accountPath = getAccountPath(name);
       console.log("[open] accountPath =", accountPath);
 
+      const mode = await vscode.window.showQuickPick(
+        [
+          { label: "Normal", description: "claude", flag: "" },
+          { label: "Skip Permissions", description: "claude --dangerously-skip-permissions", flag: " --dangerously-skip-permissions" },
+        ],
+        { placeHolder: "How do you want to start Claude?" },
+      );
+      if (!mode) { return; }
+
       const workspaceCwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       const terminal = vscode.window.createTerminal({
         name: `Claude (${name})`,
@@ -307,7 +316,7 @@ export function activate(context: vscode.ExtensionContext) {
         env: accountEnv(accountPath),
       });
       terminal.show(true);
-      terminal.sendText("claude");
+      terminal.sendText(`claude${mode.flag}`);
 
       const email = await getEmail(accountPath);
       console.log("[open] email =", email);

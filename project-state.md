@@ -1,7 +1,7 @@
 # Claude Code Multi-Account VSCode Extension — Project State
 
 **Last updated:** 2026-03-31
-**Last commit:** f2e10ad
+**Last commit:** TBD
 
 ---
 
@@ -143,6 +143,8 @@ dist/
 - Repo made public-ready
 - Fixed terminal `cwd`: opening an account now uses the current VS Code workspace folder instead of the account profile folder, so `claude` starts in the user's project directory
 - Renamed extension display name to "Claude Account Switcher" (activity bar title + `displayName` in `package.json`)
+- Added launch mode quick-pick on account click: user chooses between `claude` (normal) or `claude --dangerously-skip-permissions` before terminal opens
+- Added `@vscode/vsce` as dev dependency + `vsce:package` npm script so VSIX can be built via `node_modules/.bin/vsce package` without a global install
 
 ---
 
