@@ -67,12 +67,59 @@ Shows the currently active account: `⊙ Claude: main`
 
 ## Installation
 
-This extension is not yet published to the VS Code Marketplace. To install manually:
+This extension is not yet on the VS Code Marketplace. Two options:
 
-1. Clone this repo
-2. Run `npm install`
-3. Run `npm run package` — produces `dist/extension.js`
-4. Press `F5` in VS Code to launch the Extension Development Host, or package as a `.vsix` with `vsce package`
+### 🚀 Option 1 — Dev mode (fastest)
+
+Just press `F5` in VS Code. Opens an Extension Development Host with the extension running. Good for testing, but doesn't persist across restarts.
+
+### 📦 Option 2 — Real install (permanent)
+
+Installs into your main VS Code like a normal extension.
+
+**Step 1 — Clone and install dependencies**
+
+```bash
+git clone https://github.com/nukec/claude-code-multi-account-extension
+cd claude-code-multi-account-extension
+npm install
+```
+
+**Step 2 — Build**
+
+```bash
+npm run package
+```
+
+**Step 3 — Package as `.vsix`**
+
+```bash
+npx vsce package
+```
+
+Produces: `claude-code-multi-account-0.0.1.vsix`
+
+> Or skip steps 1–3 and download the `.vsix` directly from the repo.
+
+**Step 4 — Install**
+
+Option A — GUI:
+1. Open VS Code
+2. Go to the Extensions panel
+3. Click `...` (top right)
+4. Click **Install from VSIX...**
+5. Select the `.vsix` file
+
+Option B — CLI:
+```bash
+code --install-extension claude-code-multi-account-0.0.1.vsix
+```
+
+**Step 5 — Reload**
+
+`Ctrl+Shift+P` → **Reload Window**
+
+Done — the extension now runs in your main VS Code, persistently, no `F5` needed.
 
 ---
 

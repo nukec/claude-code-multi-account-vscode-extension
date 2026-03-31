@@ -1,7 +1,7 @@
 # Claude Code Multi-Account VSCode Extension — Project State
 
 **Last updated:** 2026-03-31
-**Last commit:** TBD
+**Last commit:** 8ab736c
 
 ---
 
