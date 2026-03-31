@@ -55,27 +55,60 @@ export function activate(context: vscode.ExtensionContext) {
     return readClaudeConfig(cwd).email;
   }
 
-  // Spawn pty-worker.js as a hidden child process — keeps conpty from stealing focus.
+  // Run claude directly in a hidden shell integration terminal, send /usage, read output stream.
+  // No node-pty needed — claude runs in VS Code's own terminal which has a real console.
   function getUsageViaPty(cwd: string): Promise<string | null> {
     return new Promise((resolve) => {
-      const { spawn } = require("child_process") as typeof import("child_process");
-      const workerPath = path.join(__dirname, "pty-worker.js");
+      let done = false;
 
-      const child = spawn(process.execPath, [workerPath, cwd], {
-        windowsHide: true,
-        stdio: ["ignore", "pipe", "ignore"],
+      const terminal = vscode.window.createTerminal({
+        name: `__claude_usage__`,
+        cwd,
+        env: accountEnv(cwd),
+        // hideFromUser: true, // disabled to test if shell integration fires without it
       });
 
-      let output = "";
-      child.stdout.on("data", (d: Buffer) => { output += d.toString(); });
+      const shellListener = vscode.window.onDidChangeTerminalShellIntegration(async ({ terminal: t, shellIntegration }) => {
+        if (t !== terminal) { return; }
+        shellListener.dispose();
+        console.log("[usage] shell integration fired");
 
-      const timer = setTimeout(() => { try { child.kill(); } catch { /* ignore */ } }, 12000);
+        const execution = shellIntegration.executeCommand("echo /usage | claude");
+        let output = "";
 
-      child.on("close", () => {
-        clearTimeout(timer);
-        const match = output.match(/(\d+)%/);
-        resolve(match ? match[1] + "%" : null);
+        for await (const chunk of execution.read()) {
+          output += chunk;
+          const stripped = output.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
+          const match =
+            stripped.match(/[Cc]urrent week[^%]*?(\d+)%/) ||
+            stripped.match(/[Uu]sage[^%]*?(\d+)%/) ||
+            stripped.match(/[Ll]imit[^%]*?(\d+)%/);
+          if (match && !done) {
+            done = true;
+            terminal.sendText("/exit");
+            terminal.dispose();
+            resolve(match[1] + "%");
+            return;
+          }
+        }
+
+        if (!done) {
+          done = true;
+          console.log("[usage] no match, tail:", JSON.stringify(output.slice(-300)));
+          try { terminal.dispose(); } catch { /* ignore */ }
+          resolve(null);
+        }
       });
+
+      setTimeout(() => {
+        if (!done) {
+          done = true;
+          shellListener.dispose();
+          try { terminal.dispose(); } catch { /* ignore */ }
+          console.log("[usage] timeout");
+          resolve(null);
+        }
+      }, 20000);
     });
   }
 

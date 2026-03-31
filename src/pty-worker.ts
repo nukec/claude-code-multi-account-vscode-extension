@@ -5,6 +5,11 @@
  */
 import type * as NodePty from "node-pty";
 
+process.on("uncaughtException", (err) => {
+  process.stdout.write("ERROR:" + err.message);
+  process.exit(1);
+});
+
 const accountPath = process.argv[2];
 if (!accountPath) { process.exit(1); }
 
@@ -36,6 +41,7 @@ const proc = ptyModule.spawn(shell, args, {
   rows: 30,
   cwd: accountPath,
   env,
+  useConpty: false, // use winpty backend — conpty requires AttachConsole which fails without a console host
 });
 
 let output = "";
@@ -51,7 +57,11 @@ proc.onData((data) => {
   }
   if (usageSent) {
     const stripped = output.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
-    const match = stripped.match(/(\d+)%/);
+    // Prefer "Current week" line; fall back to any usage context line
+    const match =
+      stripped.match(/[Cc]urrent week[^%]*?(\d+)%/) ||
+      stripped.match(/[Uu]sage[^%]*?(\d+)%/) ||
+      stripped.match(/[Ll]imit[^%]*?(\d+)%/);
     if (match) {
       done = true;
       process.stdout.write(match[1] + "%");

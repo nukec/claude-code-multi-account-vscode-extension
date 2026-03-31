@@ -1,7 +1,7 @@
 # Claude Code Multi-Account VSCode Extension — Project State
 
-**Last updated:** 2026-03-30
-**Last commit:** TBD
+**Last updated:** 2026-03-31
+**Last commit:** 84f5464
 
 ---
 
@@ -85,7 +85,7 @@ Uses a **detached hidden child process** (`dist/pty-worker.js`) to avoid conpty 
 2. Worker spawns a PTY internally, runs `claude`, sends `/usage`, parses output
 3. Result written to stdout, extension reads it and updates sidebar
 
-**Known issue:** Usage % not currently appearing in sidebar — pty-worker may be timing out or failing to parse. Under investigation.
+**Known issue:** Usage % not working — 6 approaches tried, all failed. Full debug log in `debugging/usage-fetch-problem.md`. Next to try: `printf '/usage\nexit\n' | claude` or temp-file workaround.
 
 ### 6. Refresh Button
 
