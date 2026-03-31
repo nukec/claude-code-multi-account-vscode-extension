@@ -12,3 +12,9 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
+CLAUDE.md
+project-state.md
+changelog.md
+debugging/**
+.claude/**
+memory/**
