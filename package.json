@@ -11,7 +11,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/nukec/claude-code-multi-account-extension"
+    "url": "https://github.com/nukec/claude-code-multi-account-vscode-extension"
   },
   "activationEvents": [
     "onView:claudeProfilesView"

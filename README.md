@@ -1,4 +1,4 @@
-# Claude Code Multi-Account
+# Claude Code Multi-Account VS Code Extension
 
 A VS Code extension for managing multiple [Claude Code](https://claude.ai/code) CLI accounts simultaneously — using session isolation, not API keys.
 
@@ -80,7 +80,7 @@ Installs into your main VS Code like a normal extension.
 **Step 1 — Clone and install dependencies**
 
 ```bash
-git clone https://github.com/nukec/claude-code-multi-account-extension
+git clone https://github.com/nukec/claude-code-multi-account-vscode-extension
 cd claude-code-multi-account-extension
 npm install
 ```
