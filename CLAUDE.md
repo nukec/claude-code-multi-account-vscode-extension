@@ -6,6 +6,8 @@
 
 - NEVER run `git commit`, `git push`, or create branches unless the user explicitly says one of the trigger phrases in the Git Exception Rule below
 - DO NOT suggest git commands unless explicitly asked
+- NEVER add `Co-Authored-By` or any trailer lines to commit messages
+- ALWAYS prefix git commands with `HOME=/c/Users/webbed` — the shell runs inside an extension terminal with a overridden HOME; without this prefix git cannot find the global config or SSH keys
 
 ### Files & Scope
 

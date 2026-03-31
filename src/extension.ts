@@ -112,12 +112,36 @@ export function activate(context: vscode.ExtensionContext) {
     });
   }
 
+  /**
+   * Creates a per-account launch-claude.cmd wrapper that sets the isolated env
+   * vars only for the claude process. The terminal itself keeps the real HOME
+   * so git, SSH, npm etc. all work normally.
+   */
+  function ensureWrapper(accountPath: string): string {
+    const wrapperPath = path.join(accountPath, "launch-claude.cmd");
+    const appData = path.join(accountPath, "AppData", "Roaming");
+    const localAppData = path.join(accountPath, "AppData", "Local");
+    const script = [
+      "@echo off",
+      "setlocal",
+      `set HOME=${accountPath}`,
+      `set USERPROFILE=${accountPath}`,
+      `set XDG_CONFIG_HOME=${accountPath}`,
+      `set APPDATA=${appData}`,
+      `set LOCALAPPDATA=${localAppData}`,
+      "claude %*",
+      "endlocal",
+    ].join("\r\n");
+    fs.writeFileSync(wrapperPath, script);
+    return wrapperPath;
+  }
+
   function createClaudeTerminal(name: string, accountPath: string): vscode.Terminal {
     const workspaceCwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const terminal = vscode.window.createTerminal({
       name: `Claude (${name})`,
       cwd: workspaceCwd ?? accountPath,
-      env: accountEnv(accountPath),
+      // No env override here — isolation is handled by launch-claude.cmd wrapper
     });
     terminal.show(true); // preserveFocus: keep sidebar focused so next click works immediately
     return terminal;
@@ -309,14 +333,15 @@ export function activate(context: vscode.ExtensionContext) {
       );
       if (!mode) { return; }
 
+      const wrapperPath = ensureWrapper(accountPath);
       const workspaceCwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       const terminal = vscode.window.createTerminal({
         name: `Claude (${name})`,
         cwd: workspaceCwd ?? accountPath,
-        env: accountEnv(accountPath),
+        // No env override — wrapper script scopes isolation to claude only
       });
       terminal.show(true);
-      terminal.sendText(`claude${mode.flag}`);
+      terminal.sendText(`"${wrapperPath}"${mode.flag}`);
 
       const email = await getEmail(accountPath);
       console.log("[open] email =", email);

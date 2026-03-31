@@ -145,6 +145,7 @@ dist/
 - Renamed extension display name to "Claude Account Switcher" (activity bar title + `displayName` in `package.json`)
 - Added launch mode quick-pick on account click: user chooses between `claude` (normal) or `claude --dangerously-skip-permissions` before terminal opens
 - Added `@vscode/vsce` as dev dependency + `vsce:package` npm script so VSIX can be built via `node_modules/.bin/vsce package` without a global install
+- Fixed env leak: terminal no longer has HOME/USERPROFILE overridden — isolation now handled by a per-account `launch-claude.cmd` wrapper (uses `setlocal`/`endlocal` to scope env to the claude process only). Git, SSH, npm all work normally in the terminal.
 
 ---
 
