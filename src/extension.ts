@@ -113,9 +113,10 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   function createClaudeTerminal(name: string, accountPath: string): vscode.Terminal {
+    const workspaceCwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const terminal = vscode.window.createTerminal({
       name: `Claude (${name})`,
-      cwd: accountPath,
+      cwd: workspaceCwd ?? accountPath,
       env: accountEnv(accountPath),
     });
     terminal.show(true); // preserveFocus: keep sidebar focused so next click works immediately
@@ -299,9 +300,10 @@ export function activate(context: vscode.ExtensionContext) {
       const accountPath = getAccountPath(name);
       console.log("[open] accountPath =", accountPath);
 
+      const workspaceCwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       const terminal = vscode.window.createTerminal({
         name: `Claude (${name})`,
-        cwd: accountPath,
+        cwd: workspaceCwd ?? accountPath,
         env: accountEnv(accountPath),
       });
       terminal.show(true);

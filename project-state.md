@@ -1,7 +1,7 @@
 # Claude Code Multi-Account VSCode Extension — Project State
 
 **Last updated:** 2026-03-31
-**Last commit:** 8ab736c
+**Last commit:** TBD
 
 ---
 
@@ -141,6 +141,8 @@ dist/
   - Added `LICENSE` (MIT)
 - Removed `*.vsix` from `.gitignore` so built packages are tracked
 - Repo made public-ready
+- Fixed terminal `cwd`: opening an account now uses the current VS Code workspace folder instead of the account profile folder, so `claude` starts in the user's project directory
+- Renamed extension display name to "Claude Account Switcher" (activity bar title + `displayName` in `package.json`)
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "claude-code-multi-account",
-  "displayName": "claude-code-multi-account",
+  "displayName": "Claude Account Switcher",
   "description": "Multi-account Claude Code manager",
   "version": "0.0.1",
   "engines": {
@@ -22,7 +22,7 @@
       "activitybar": [
         {
           "id": "claudeProfiles",
-          "title": "Claude",
+          "title": "Claude Account Switcher",
           "icon": "resources/icon.svg"
         }
       ]
